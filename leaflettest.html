@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>UWB Dashboard with Hover‑Distance</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+    crossorigin=""
+  />
+
+  <style>
+
+    html, body {
+      margin: 0; padding: 0;
+      height: 100%; width: 100%;
+      font-family: Arial, sans-serif;
+    }
+    .dashboard {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    #map-container {
+      flex: 0 0 60%;
+      position: relative;
+    }
+    #map {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+    }
+
+    #metrics {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      padding: 1rem;
+      background: #f7f7f7;
+      overflow-y: auto;
+    }
+    .metric {
+      background: white;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .metric h3 {
+      margin-top: 0;
+      font-size: 1.1rem;
+      color: #333;
+    }
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .history-table th,
+    .history-table td {
+      border: 1px solid #ddd;
+      padding: 0.5rem;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    .history-table th {
+      background: #eee;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+ 
+    <div id="map-container">
+      <div id="map"></div>
+    </div>
+
+    <div id="metrics">
+      <div class="metric">
+        <h3>Last Signal Received</h3>
+        <p id="last-signal">--:--:--</p>
+      </div>
+      <div class="metric">
+        <h3>Current Distance</h3>
+        <p id="current-distance">-- m</p>
+      </div>
+      <div class="metric" style="grid-column: span 2;">
+        <h3>History of Distances</h3>
+        <table class="history-table">
+          <thead>
+            <tr><th>Timestamp</th><th>Distance (m)</th></tr>
+          </thead>
+          <tbody id="history-body">
+         
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+    crossorigin=""
+  ></script>
+
+ <script>
+
+  var map = L.map('map').setView([33.424564, -111.928001], 16);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OSM contributors'
+  }).addTo(map);
+
+
+  var icon = L.icon({
+    iconUrl: 'nordicLogo.png',
+    iconSize:   [32, 32],
+    iconAnchor: [16, 16]
+  });
+  var a = [33.4234973, -111.9399072];
+  var b = [33.4234923, -111.9393245];
+
+  var m1 = L.marker(a, {icon:icon}).addTo(map).bindPopup('Board 1');
+  var m2 = L.marker(b, {icon:icon}).addTo(map).bindPopup('Board 2');
+  var line = L.polyline([a, b], {
+    color:'black', weight:3, dashArray:'3,6'
+  }).addTo(map);
+  line.bindTooltip('', {direction:'center', sticky:true});
+
+
+  map.fitBounds(line.getBounds().pad(0.2));
+
+
+  setInterval(function() {
+    fetch('http://127.0.0.1:8000/api/coordinates')
+      .then(function(res) { return res.json(); })
+
+      .then(function(data) {
+
+
+        a = [data.board1.lat, data.board1.lng];
+        b = [data.board2.lat, data.board2.lng];
+
+        m1.setLatLng(a);
+        m2.setLatLng(b);
+        line.setLatLngs([a, b]);
+
+        var dist = map.distance(a, b).toFixed(1) + ' m';
+        line.setTooltipContent(dist);
+
+        var ts = data.board2.last_signal.split('T')[1].replace('Z','');
+        document.getElementById('last-signal').innerText = ts;
+        document.getElementById('current-distance').innerText = dist;
+        document.getElementById('history-body').innerHTML =
+          '<tr><td>' + ts + '</td><td>' + dist + '</td></tr>';
+
+      });
+  }, 2000);
+</script>
+
+  
+</body>
+</html>
